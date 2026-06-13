@@ -25,6 +25,7 @@ import torch.nn as nn
 
 import env          # noqa: F401  (registers MiniGrid-SimpleDoorKey-* on import)
 import register_doorkey8x8  # noqa: F401  (additively registers MiniGrid-SimpleDoorKey-Min8-Max8-View3)
+import register_doorkey12_14  # noqa: F401  (additively registers MiniGrid-SimpleDoorKey-Min12-Max14-View3)
 import utils
 import algos
 from gae import compute_gae
