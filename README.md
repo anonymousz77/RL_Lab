@@ -1,6 +1,6 @@
 # PPO-only Baselines on MiniGrid DoorKey Environments
 
-Bare Proximal Policy Optimization (PPO) baselines on four sparse-reward MiniGrid
+Bare Proximal Policy Optimization (PPO) baselines on five sparse-reward MiniGrid
 DoorKey environments, trained with environment reward only and **no teacher and no
 reward shaping**. These runs are the no-teacher reference point for an LLM-teacher
 comparison study: they measure how far a standard deep-RL agent gets on each task on
@@ -32,12 +32,15 @@ developed and evaluated separately and is not included here.
 | LavaDoorKey | `MiniGrid-LavaDoorKey-Min5-Max10-View3` | room size 5–10, agent view 3, max_steps 150 |
 | ColoredDoorKey | `MiniGrid-ColoredDoorKey-Min5-Max10-View3` | room size 5–10, 2 keys, agent view 3, max_steps 150 |
 | 8x8 DoorKey | `MiniGrid-SimpleDoorKey-Min8-Max8-View3` | fixed 8x8 room (`DoorKeyEnv` with `minRoomSize=maxRoomSize=8`, `agent_view_size=3`, `max_steps=150`), registered additively by `register_doorkey8x8.py` |
+| Larger DoorKey (12-14) | `MiniGrid-SimpleDoorKey-Min12-Max14-View3` | room size 12–14, agent view 3, max_steps 196 (`DoorKeyEnv` with `minRoomSize=12, maxRoomSize=14, agent_view_size=3, max_steps=196`), registered additively by `register_doorkey12_14.py` |
 
-The 8x8 environment reuses the base `DoorKeyEnv` class with only the room-size kwargs
-changed, so it stays inside the same observation family as the other tasks. SimpleDoorKey,
-LavaDoorKey and ColoredDoorKey were run for **200 iterations** (~10 episodes/iter);
-SimpleDoorKey additionally has a full **1000-iteration** record (the data in
-`ppo_simpledoorkey/`).
+The 8x8 and 12-14 environments reuse the base `DoorKeyEnv` class with only the room-size
+(and, for 12-14, the `max_steps`) kwargs changed, so they stay inside the same observation
+family as the other tasks. SimpleDoorKey, LavaDoorKey and ColoredDoorKey were run for **200
+iterations** (~10 episodes/iter); SimpleDoorKey and the larger 12-14 grid additionally have
+full **1000-iteration** records (the data in `ppo_simpledoorkey/` and `ppo_doorkey12_14/`).
+On the 12-14 grid the episode cap is 196 steps, so a longer rollout horizon (245) keeps the
+~10 episodes/iter budget.
 
 ## Results
 
@@ -50,14 +53,18 @@ environment's `metrics.csv`.
 | LavaDoorKey | 200 | 300,800 | 0.000 / 0.111 | 0.000 / 0.100 |
 | ColoredDoorKey | 200 | 300,800 | 0.000 / 0.125 | 0.000 / 0.100 |
 | 8x8 DoorKey | 200 | 300,800 | 0.000 / 0.125 | 0.000 / 0.000 |
+| Larger DoorKey (12-14) | 1000 | 1,960,000 | 0.000 / 0.111 | 0.000 / 0.000 |
 
-**Finding.** Bare PPO-only stays at essentially **0% success** on all four sparse-reward
+**Finding.** Bare PPO-only stays at essentially **0% success** on all five sparse-reward
 DoorKey tasks, even with GAE and 8 parallel environments and up to ~1.3M environment steps
 on SimpleDoorKey. The only non-zero success rates are isolated single-iteration flukes (the
 "best" column), never a sustained policy, and final success is 0.000 everywhere. This is the
 **intended weak baseline**: it isolates the difficulty of sparse-reward exploration on these
 tasks and provides the reference floor that the teacher-guided methods are meant to improve
-on. See each folder's `*_success.png` and `*_success_vs_steps.png` for the learning curves.
+on. The larger 12-14 grid — harder than the 5–10 tasks, with a bigger observation and a
+196-step cap — likewise stays flat at 0.000 final success across a full 1000-iteration
+(~1.96M-step) run, confirming the floor holds as the task scales up. See each folder's
+`*_success.png` and `*_success_vs_steps.png` for the learning curves.
 
 ## Repository layout
 
@@ -68,10 +75,11 @@ ppo_better_train.py        # PPO + GAE trainer (8 parallel envs); env-parametric
 gae.py                     # GAE(lambda) advantage estimation
 plot_better_ppo.py         # learning-curve plotting (6-figure suite, 200 dpi)
 register_doorkey8x8.py     # additively registers the 8x8 DoorKey gym id
+register_doorkey12_14.py   # additively registers the larger Min12-Max14 DoorKey gym id
 env/  algos/  utils/       # base environments + ActorCritic + helpers (dependencies)
 requirements.txt
 
-ppo_simpledoorkey/   ppo_lavadoorkey/   ppo_coloreddoorkey/   ppo_doorkey8x8/
+ppo_simpledoorkey/   ppo_lavadoorkey/   ppo_coloreddoorkey/   ppo_doorkey8x8/   ppo_doorkey12_14/
 ```
 
 Each `ppo_<env>/` folder contains:
@@ -97,7 +105,7 @@ set PYTHONUTF8=1
 
 SimpleDoorKey (1000 iterations):
 ```bat
-python ppo_better_train.py --env-key MiniGrid-SimpleDoorKey-Min5-Max10-View3 --rollout 188 --iters 1000 --no-guard --results-subdir ppo_simpledoorkey
+python ppo_better_train.py --env-key MiniGrid-SimpleDoorKey-Min5-Max10-View3 --rollout 160 --iters 1000 --no-guard --results-subdir ppo_simpledoorkey
 python plot_better_ppo.py --subdir ppo_simpledoorkey --title "Bare PPO-only (8 envs + GAE) - SimpleDoorKey, seed 42"
 ```
 
@@ -117,6 +125,12 @@ python plot_better_ppo.py --subdir ppo_coloreddoorkey --title "Bare PPO-only (8 
 ```bat
 python ppo_better_train.py --env-key MiniGrid-SimpleDoorKey-Min8-Max8-View3 --rollout 188 --iters 200 --no-guard --results-subdir ppo_doorkey8x8
 python plot_better_ppo.py --subdir ppo_doorkey8x8 --title "Bare PPO-only (8 envs + GAE) - DoorKey 8x8, seed 42"
+```
+
+Larger DoorKey 12-14 (1000 iterations; registered by `register_doorkey12_14.py`, imported automatically by the trainer). The 196-step episode cap uses a longer rollout horizon (245) to keep ~10 episodes/iter (8 x 245 = 1960 ≈ 10 x 196):
+```bat
+python ppo_better_train.py --env-key MiniGrid-SimpleDoorKey-Min12-Max14-View3 --rollout 245 --iters 1000 --no-guard --results-subdir ppo_doorkey12_14
+python plot_better_ppo.py --subdir ppo_doorkey12_14 --title "Bare PPO-only (8 envs + GAE) - SimpleDoorKey Min12-Max14, seed 42"
 ```
 
 Each run writes `metrics.csv`, `history.json`, `model.pt`, and the six plots into
